@@ -1,0 +1,5 @@
+streamlit>=1.45,<2
+openpyxl>=3.1.5,<4
+pandas>=2.2,<3
+google-genai>=1.60,<2
+pydantic>=2.8,<3

@@ -149,6 +149,47 @@ def next_month(year, month):
     return (year + 1, 1) if month == 12 else (year, month + 1)
 
 
+def copy_cell(src, dst):
+    """Copy a cell while preserving formatting and translating relative formulas."""
+    if src.data_type == "f" and isinstance(src.value, str):
+        try:
+            dst.value = Translator(src.value, origin=src.coordinate).translate_formula(dst.coordinate)
+        except Exception:
+            dst.value = src.value
+    else:
+        dst.value = src.value
+
+    if src.has_style:
+        dst._style = copy(src._style)
+    if src.number_format:
+        dst.number_format = src.number_format
+    if src.font:
+        dst.font = copy(src.font)
+    if src.fill:
+        dst.fill = copy(src.fill)
+    if src.border:
+        dst.border = copy(src.border)
+    if src.alignment:
+        dst.alignment = copy(src.alignment)
+    if src.protection:
+        dst.protection = copy(src.protection)
+    if src.hyperlink:
+        dst._hyperlink = copy(src.hyperlink)
+    if src.comment:
+        dst.comment = copy(src.comment)
+
+
+def copy_row_dimensions(ws, src_row, dst_row):
+    """Copy visible row properties to the cloned month block."""
+    src_dim = ws.row_dimensions[src_row]
+    dst_dim = ws.row_dimensions[dst_row]
+    if src_dim.height is not None:
+        dst_dim.height = src_dim.height
+    dst_dim.hidden = src_dim.hidden
+    dst_dim.outlineLevel = src_dim.outlineLevel
+    dst_dim.collapsed = src_dim.collapsed
+
+
 def copy_merged_ranges_for_block(ws, src_start, src_end, dst_start):
     shift = dst_start - src_start
     for rng in list(ws.merged_cells.ranges):
@@ -218,9 +259,12 @@ def get_old_readings(wb, room, start_row):
     return old_e, old_w
 
 def previous_numeric_reading(ws, target_row, offset):
-    """Find the latest numeric I-value before target_row for a utility row."""
-    for r in range(target_row - 1, 0, -1):
-        v = ws.cell(r + offset, 9).value
+    """Find the latest numeric I-value for the same utility in an earlier month block."""
+    utility_row = target_row + offset
+    # Each room month block in this workbook is 5 rows: Phòng/Điện/Nước/Rác/Tổng.
+    # Step by 5 so we never accidentally take a value from another utility row.
+    for r in range(utility_row - 5, 0, -5):
+        v = ws.cell(r, 9).value
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             return v
     return None
